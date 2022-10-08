@@ -1,6 +1,6 @@
 import re
 import pandas as pd
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, DDL
 
 # class not appropriate for single method process
 
@@ -20,6 +20,14 @@ for parquet in parquets:
 
 # create engine to direct pandas to the features database
 engine = create_engine('postgresql://postgres:password@localhost:5432/postgres')
+
+# load sql file
+with open('init_db.sql', 'r') as file:
+    sql = file.read()
+
+# execute ddl
+with engine.connect() as con:
+    con.execute(DDL(sql))
 
 # execute data insertion for each table
 for table_tup in tables:

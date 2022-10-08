@@ -1,0 +1,38 @@
+prerequisites:
+brew install minikube
+download docker desktop
+---
+status:
+kubectl get node
+kubectl get pvc
+kubectl get all
+kubectl describe pod <podname>
+---
+config kub:
+# start app
+minikube start --driver=docker
+
+# apply yaml defined components to create db
+kubectl apply -f postgres-cm.yaml
+kubectl apply -f postgres-pv.yaml
+kubectl apply -f postgres-svc.yaml
+kubectl apply -f postgres-sec.yaml
+kubectl apply -f postgres-dep.yaml
+
+# access postgres from command line
+# TODO: show how to find pod names
+kubectl exec -it postgres-76c84dc8d8-tss4l --  psql -h localhost -U postgres --password -p 5432 postgres
+Password=password
+
+# ensure any local postgres services are not running
+brew services stop postgresql
+
+# forward postgres port outside virtual network
+# TODO: show how to find pod names
+kubectl port-forward postgres-76c84dc8d8-tss4l 5432:5432
+
+# execute LoadData.py
+python3 LoadData.py
+
+
+

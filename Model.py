@@ -7,6 +7,7 @@ import pandas as pd
 from sqlalchemy import create_engine
 
 # TODO: add log statements and ensure pythonic formatting
+"""finish documenting this class"""
 class OfferLR:
 
     def __init__(self, spark):
@@ -33,6 +34,7 @@ class OfferLR:
         self.test = test
 
     def pull_data(self):
+        # TODO: reassign uri to kubernetes virtual network IP
         # create engine to direct pandas to the features database
         engine = create_engine('postgresql://postgres:password@localhost:5432/postgres')
 
