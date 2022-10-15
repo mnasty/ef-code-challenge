@@ -7,6 +7,10 @@ kubectl get node
 kubectl get pvc
 kubectl get all
 kubectl describe pod <podname>
+
+delete deployment (in case of err):
+kubectl get deploy
+kubectl delete deploy <name>
 ---
 config kub:
 # start app
@@ -17,6 +21,7 @@ kubectl apply -f postgres-cm.yaml
 kubectl apply -f postgres-pv.yaml
 kubectl apply -f postgres-svc.yaml
 kubectl apply -f postgres-sec.yaml
+
 kubectl apply -f postgres-dep.yaml
 
 # access postgres from command line
@@ -33,6 +38,21 @@ kubectl port-forward postgres-76c84dc8d8-tss4l 5432:5432
 
 # execute LoadData.py
 python3 LoadData.py
+
+# set docker env for local API image deployment
+eval $(minikube docker-env)
+
+# build docker image, ensure you're running from /code-challenge project root
+docker build . -t click-api-env
+
+# deploy API
+kubectl apply -f api-svc.yaml
+
+kubectl apply -f res/k8/api-dep.yaml
+
+# expose service
+minikube service click-service
+
 
 
 

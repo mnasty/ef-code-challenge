@@ -90,7 +90,7 @@ class OfferLR:
         return self
 
     def fit_or_load(self, saved=False, reg_param=0.1, elastic_net_param=1.0):
-        mdl_path = 'models/lr_model_' + str(reg_param) + '_' + str(elastic_net_param)
+        mdl_path = 'res/models/lr_model_' + str(reg_param) + '_' + str(elastic_net_param)
         if saved:
             print('Loading Saved Model..')
             self.lr_model = LogisticRegressionModel.load(mdl_path)

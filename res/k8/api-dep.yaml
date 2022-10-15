@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: click-api-deployment
+  labels:
+    app: click-api
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: click-api
+  template:
+    metadata:
+      labels:
+        app: click-api
+    spec:
+      containers:
+        - name: click-api
+          image: click-api-env:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8080

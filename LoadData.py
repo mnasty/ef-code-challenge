@@ -22,7 +22,7 @@ for parquet in parquets:
 engine = create_engine('postgresql://postgres:password@localhost:5432/postgres')
 
 # load sql file
-with open('init_db.sql', 'r') as file:
+with open('res/init_db.sql', 'r') as file:
     sql = file.read()
 
 # execute ddl
