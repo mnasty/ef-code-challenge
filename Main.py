@@ -2,14 +2,20 @@ from pyspark.sql import SparkSession
 from Model import OfferLR
 import time, datetime
 
-# init spark
+# # init spark (local only) ->
+# spark = SparkSession.builder \
+#     .master('local[*]') \
+#     .config('spark.driver.memory', '8g') \
+#     .config('spark.sql.execution.arrow.pyspark.enabled', 'true') \
+#     .appName('lr-model') \
+#     .getOrCreate()
+
+# init spark (k8s only) ->
 spark = SparkSession.builder \
-    .master('local[*]') \
-    .config('spark.driver.memory', '8g') \
-    .config('spark.sql.execution.arrow.pyspark.enabled', 'true') \
-    .appName('code-challenge') \
+    .appName('lr-model') \
     .getOrCreate()
 
+# TODO: configure subscription to kafka
 # init custom model objects for below demo
 retrain_lr = OfferLR(spark=spark)
 batch_lr = OfferLR(spark=spark)

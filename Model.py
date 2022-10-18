@@ -36,7 +36,7 @@ class OfferLR:
     def pull_data(self):
         # TODO: reassign uri to kubernetes virtual network IP
         # create engine to direct pandas to the features database
-        engine = create_engine('postgresql://postgres:password@localhost:5432/postgres')
+        engine = create_engine('postgresql://postgres:password@10.110.230.221:5432/postgres')
 
         # define query and join conditions to generate train set
         q = "SELECT COALESCE(features.ds_clicks.offer_id, features.ds_offers.offer_id) AS offer_id, " \
