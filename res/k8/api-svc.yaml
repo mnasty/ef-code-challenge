@@ -4,8 +4,8 @@ metadata:
   name: click-service
 spec:
   ports:
-  - port: 8080
-    protocol: TCP
+  - name: api
+    port: 8080
     targetPort: 8080
   selector:
     app: click-api

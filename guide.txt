@@ -13,6 +13,9 @@ kubectl get all
 kubectl describe pod <podname>
 kubectl logs -f <podname>
 
+terminal access:
+kubectl exec -it <pod_name> -- /bin/bash
+
 delete deployment (in case of err):
 kubectl get deploy
 kubectl delete deploy <name>
@@ -25,6 +28,9 @@ minikube delete
 
 view minikube dashboard:
 minikube dashboard
+
+delete trailing images:
+docker rmi $(docker images -a -q)
 
 Kub:
 ---
@@ -91,7 +97,7 @@ run-model.sh:3 -> --master k8s://https://127.0.0.1:xxxxx \
 eval $(minikube docker-env)
 
 # build custom image for env, ensure you're running from /code-challenge
-docker build . -t click-model-env
+docker build . -t click-model-env:latest
 
 # deploy zookeeper
 kubectl apply -f res/k8/zookeeper-svc.yaml
@@ -109,9 +115,34 @@ kubectl apply -f res/k8/spark-roles.yaml
 # ensure all deployed resources have spun up successfully
 kubectl get all
 
+# access kafka pod
+kubectl exec -it kafka-deployment-6b7b57cbd9-sd27c -- /bin/bash
+
+# create topics
+kafka-topics --create --bootstrap-server localhost:29092 --replication-factor 1 --partitions 1 --topic requests
+kafka-topics --create --bootstrap-server localhost:29092 --replication-factor 1 --partitions 1 --topic responses
+
+# TODO: remove this
+# test consumer
+kafka-console-consumer --bootstrap-server localhost:29092 --topic current-model-req
+
 # submit job
 chmod +x run-model.sh
 ./run-model.sh
+
+# # lender_id, loan_purpose, credit, annual_income, apr
+#  |-- offer_id: long (nullable = true)
+#  |-- lead_uuid: string (nullable = true)
+#  |-- lender_id: long (nullable = true)
+#  |-- requested: double (nullable = true)
+#  |-- loan_purpose: string (nullable = true)
+#  |-- credit: string (nullable = true)
+#  |-- annual_income: double (nullable = true)
+#  |-- apr: double (nullable = true)
+#  |-- is_clicked: double (nullable = false)
+#  |-- rawPrediction: vector (nullable = true)
+#  |-- probability: vector (nullable = true)
+#  |-- prediction: double (nullable = false)
 
 API:
 ---
@@ -119,7 +150,10 @@ API:
 eval $(minikube docker-env)
 
 # build docker image, ensure you're running from /code-challenge/api
-docker build . -t click-api-env
+docker build . -t click-api-env:latest
+
+# move back to root working dir
+cd ..
 
 # deploy API
 kubectl apply -f res/k8/api-svc.yaml

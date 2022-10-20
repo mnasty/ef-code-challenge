@@ -16,11 +16,15 @@ RUN apt-get install \
 
 WORKDIR /app
 
+COPY res/jars/ ${SPARK_HOME}/jars
+COPY res/models /app/res/models
 COPY Main.py /app/Main.py
 COPY Model.py /app/Model.py
 COPY requirements-model.txt /app/requirements.txt
 RUN pip install -r requirements.txt --src /usr/local/src
 
-COPY . .
+# TODO: remove this
+#COPY . .
 
-CMD [ "python3", "Main.py" ]
+# TODO: remove this
+#CMD [ "python3", "Main.py" ]

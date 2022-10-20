@@ -1,7 +1,7 @@
 import pyspark.sql.functions as f
 from pyspark.ml.feature import StringIndexer, OneHotEncoder, VectorAssembler, StandardScaler
 from pyspark.ml.classification import LogisticRegression, LogisticRegressionModel
-from pyspark.ml import Pipeline
+from pyspark.ml import Pipeline, PipelineModel
 
 import pandas as pd
 from sqlalchemy import create_engine
@@ -10,32 +10,22 @@ from sqlalchemy import create_engine
 """finish documenting this class"""
 class OfferLR:
 
-    def __init__(self, spark):
+    def __init__(self, spark, mdl_path='res/models/', saved=False):
         self.spark = spark
+        self.saved = saved
+        self.mdl_path = mdl_path
+        self.version = None
         self.current_data = None
         self.train = None
         self.test = None
         self.lr_model = None
 
-    # getters and setters for those params that could be modified directly
-    def get_current_data(self):
-        return self.current_data
-
-    def get_train(self):
-        return self.current_data
-
-    def set_train(self, train):
-        self.train = train
-
-    def get_test(self):
-        return self.test
-
-    def set_test(self, test):
-        self.test = test
-
     def pull_data(self):
-        # TODO: reassign uri to kubernetes virtual network IP
         # create engine to direct pandas to the features database
+        # local only
+        # engine = create_engine('postgresql://postgres:password@localhost:5432/postgres')
+        # k8s only
+        # TODO: reassign uri to kubernetes virtual network IP
         engine = create_engine('postgresql://postgres:password@10.110.230.221:5432/postgres')
 
         # define query and join conditions to generate train set
@@ -54,47 +44,60 @@ class OfferLR:
         return self
 
     def prep_data(self):
-        # generate a target column based on if a timestamp was present or not, clean up old column
-        raw_data = self.current_data.withColumn('is_clicked',
-                f.when(f.col('clicked_at').isNull(), f.lit(0.0)).otherwise(f.lit(1.0))).drop(f.col("clicked_at"))
+        if self.saved:
+            preprocess_pipe_mdl = PipelineModel.load(self.mdl_path + 'prep_pline')
+        else:
+            # generate a target column based on if a timestamp was present or not, clean up old column
+            self.current_data = self.current_data.withColumn('is_clicked',
+                    f.when(f.col('clicked_at').isNull(), f.lit(0.0)).otherwise(f.lit(1.0))).drop(f.col("clicked_at"))
 
-        # features with expected high correlation: lender_id, loan_purpose, credit, annual_income, apr | target: clicked_at
-        # one hot encodings only for non-ordinals: lender_id, loan_purpose, credit
-        # categorical encodings for ordinals after sort: annual_income, apr
+            # features with expected high correlation: lender_id, loan_purpose, credit, annual_income, apr | target: clicked_at
+            # one hot encodings only for non-ordinals: lender_id, loan_purpose, credit
+            # categorical encodings for ordinals after sort: annual_income, apr
 
-        # define string indexer to get categorical values
-        si_cat = StringIndexer(stringOrderType="frequencyDesc").setInputCols(["lender_id", "loan_purpose", "credit"]) \
-            .setOutputCols(["lender_id_si", "loan_purpose_si", "credit_si"]).setHandleInvalid('keep')
+            # define string indexer to get categorical values
+            si_cat = StringIndexer(stringOrderType="frequencyDesc").setInputCols(["lender_id", "loan_purpose", "credit"]) \
+                .setOutputCols(["lender_id_si", "loan_purpose_si", "credit_si"]).setHandleInvalid('keep')
 
-        # define string indexer to get categorical values for items with linear relationship
-        si_lin = StringIndexer(stringOrderType="alphabetAsc").setInputCols(['annual_income', 'apr']) \
-            .setOutputCols(['annual_income_si', 'apr_si']).setHandleInvalid('keep')
+            # define string indexer to get categorical values for items with linear relationship
+            si_lin = StringIndexer(stringOrderType="alphabetAsc").setInputCols(['annual_income', 'apr']) \
+                .setOutputCols(['annual_income_si', 'apr_si']).setHandleInvalid('keep')
 
-        # define one hot encoder to package non-linear categorical values into vectors for model consumption
-        oh_encoder = OneHotEncoder().setInputCols(si_cat.getOutputCols()) \
-            .setOutputCols(["lender_id_enc", "loan_purpose_enc", "credit_enc"])
+            # define one hot encoder to package non-linear categorical values into vectors for model consumption
+            oh_encoder = OneHotEncoder().setInputCols(si_cat.getOutputCols()) \
+                .setOutputCols(["lender_id_enc", "loan_purpose_enc", "credit_enc"])
 
-        # define vector assembler to combine all features into a single dense vector for model consumption
-        vec_assembler = VectorAssembler(outputCol="features") \
-            .setInputCols(
-            ["lender_id_enc", "annual_income_si", "apr_si", "loan_purpose_enc", "credit_enc"]).setHandleInvalid("keep")
+            # define vector assembler to combine all features into a single dense vector for model consumption
+            vec_assembler = VectorAssembler(outputCol="features").setInputCols(["lender_id_enc", "annual_income_si",
+                "apr_si", "loan_purpose_enc", "credit_enc"]).setHandleInvalid("keep")
 
-        # define standard scaler to avoid modeling inaccuracies from continuous features with large deviations
-        std_scaler = StandardScaler(inputCol=vec_assembler.getOutputCol(), outputCol="scaled_feat")
+            # define standard scaler to avoid modeling inaccuracies from continuous features with large deviations
+            std_scaler = StandardScaler(inputCol=vec_assembler.getOutputCol(), outputCol="scaled_feat")
 
-        # wrap all defined stages in pipeline object
-        preprocess_pipeline = Pipeline(stages=[si_cat, si_lin, oh_encoder, vec_assembler, std_scaler])
+            # wrap all defined stages in pipeline object
+            preprocess_pipe_mdl = Pipeline(stages=[si_cat, si_lin, oh_encoder, vec_assembler, std_scaler])\
+                .fit(self.current_data)
+            # export pickled pipeline to process streaming input features consistently later
+            preprocess_pipe_mdl.write().overwrite().save(self.mdl_path + 'prep_pline')
+
         # apply to data
-        self.current_data = preprocess_pipeline.fit(raw_data).transform(raw_data)
-
+        self.current_data = preprocess_pipe_mdl.transform(self.current_data)
         return self
 
-    def fit_or_load(self, saved=False, reg_param=0.1, elastic_net_param=1.0):
-        mdl_path = 'res/models/lr_model_' + str(reg_param) + '_' + str(elastic_net_param)
-        if saved:
-            print('Loading Saved Model..')
-            self.lr_model = LogisticRegressionModel.load(mdl_path)
+    def fit_or_load(self, reg_param=0.1, elastic_net_param=1.0):
+        if self.saved:
+            if self.version is not None:
+                print('Loading Saved Model..')
+                # TODO: fix model path
+                self.lr_model = LogisticRegressionModel.load(self.mdl_path)
+            else:
+                # TODO: function wrap
+                self.version = str(reg_param) + '_' + str(elastic_net_param)
+                mdl_path = self.mdl_path + 'lr_model_' + self.version
         else:
+            self.version = str(reg_param) + '_' + str(elastic_net_param)
+            mdl_path = self.mdl_path + 'lr_model_' + self.version
+
             # get train test split
             self.train, self.test = self.current_data.randomSplit([0.9, 0.1], seed=999)
             # instantiate instance of logistic regression
@@ -108,17 +111,55 @@ class OfferLR:
         return self
 
     def transform(self):
-        # fetch predictions in batch
-        results = self.lr_model.transform(self.test)
-        # TODO; for API stream ?
-        # fetch predictions per request
-        # lr_model.predict(test0.head().features)
+        if self.test is not None:
+            if self.saved:
+                results = self.lr_model.transform(self.current_data)
+            else:
+                # fetch predictions in batch
+                results = self.lr_model.transform(self.test)
 
-        # drop unneeded cols from processing
-        results = results.drop(*["lender_id_si", "loan_purpose_si", "credit_si", "annual_income_si", "apr_si",
-                                 "lender_id_enc", "loan_purpose_enc", "credit_enc", "features", "scaled_feat"])
+            # drop unneeded cols from processing
+            results = results.drop(*["lender_id_si", "loan_purpose_si", "credit_si", "annual_income_si", "apr_si",
+                                     "lender_id_enc", "loan_purpose_enc", "credit_enc", "features", "scaled_feat"])
 
-        # TODO: screw around with class imbalance if you have extra time
-        # results = results.filter('is_clicked > 0.0')
-        return results
+            # TODO: screw around with class imbalance if you have extra time
+            # results = results.filter('is_clicked > 0.0')
+            return results
+
+    # getters and setters for those params that could be modified directly
+    def get_current_data(self):
+        return self.current_data
+
+    def get_train(self):
+        return self.train
+
+    def get_test(self):
+        return self.test
+
+    def get_mdl_path(self):
+        return self.mdl_path
+
+    def get_saved(self):
+        return self.saved
+
+    def get_version(self):
+        return self.version
+
+    def set_current_data(self, data):
+        self.current_data = data
+
+    def set_train(self, train):
+        self.train = train
+
+    def set_test(self, test):
+        self.test = test
+
+    def set_mdl_path(self, path):
+        self.mdl_path = path
+
+    def set_saved(self, saved):
+        self.saved = bool(saved)
+
+    def set_version(self, version):
+        self.version = version
 
