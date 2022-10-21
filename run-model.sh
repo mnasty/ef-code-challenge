@@ -14,6 +14,7 @@ spark-submit \
 --conf spark.pyspark.python=python3 \
 --conf spark.pyspark.driver.python=python3 \
 --conf spark.sql.execution.arrow.pyspark.enabled=true \
+--conf spark.sql.streaming.checkpointLocation=/tmp/checkpoints/ \
 --packages \
 org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.0,\
 org.apache.spark:spark-token-provider-kafka-0-10_2.12:3.3.0,\

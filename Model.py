@@ -6,11 +6,11 @@ from pyspark.ml import Pipeline, PipelineModel
 import pandas as pd
 from sqlalchemy import create_engine
 
-# TODO: add log statements and ensure pythonic formatting
+# TODO: ensure pythonic formatting
 """finish documenting this class"""
 class OfferLR:
 
-    def __init__(self, spark, mdl_path='res/models/', saved=False):
+    def __init__(self, spark, mdl_path=None, saved=False):
         self.spark = spark
         self.saved = saved
         self.mdl_path = mdl_path
@@ -25,7 +25,7 @@ class OfferLR:
         # local only
         # engine = create_engine('postgresql://postgres:password@localhost:5432/postgres')
         # k8s only
-        # TODO: reassign uri to kubernetes virtual network IP
+        # TODO: reassign uri to unique kubernetes virtual network IP
         engine = create_engine('postgresql://postgres:password@10.110.230.221:5432/postgres')
 
         # define query and join conditions to generate train set
@@ -45,7 +45,7 @@ class OfferLR:
 
     def prep_data(self):
         if self.saved:
-            preprocess_pipe_mdl = PipelineModel.load(self.mdl_path + 'prep_pline')
+            preprocess_pipe_mdl = PipelineModel.load('res/models/prep_pline')
         else:
             # generate a target column based on if a timestamp was present or not, clean up old column
             self.current_data = self.current_data.withColumn('is_clicked',
@@ -78,25 +78,29 @@ class OfferLR:
             preprocess_pipe_mdl = Pipeline(stages=[si_cat, si_lin, oh_encoder, vec_assembler, std_scaler])\
                 .fit(self.current_data)
             # export pickled pipeline to process streaming input features consistently later
-            preprocess_pipe_mdl.write().overwrite().save(self.mdl_path + 'prep_pline')
+            preprocess_pipe_mdl.write().overwrite().save('res/models/prep_pline')
 
         # apply to data
         self.current_data = preprocess_pipe_mdl.transform(self.current_data)
+        # TODO: remove this
+        self.current_data.writeStream.format('console').option("truncate", "false").start()
         return self
 
     def fit_or_load(self, reg_param=0.1, elastic_net_param=1.0):
+        # if using a saved model
         if self.saved:
-            if self.version is not None:
+            # if we've already set a model path, load model
+            if self.mdl_path is not None:
                 print('Loading Saved Model..')
-                # TODO: fix model path
                 self.lr_model = LogisticRegressionModel.load(self.mdl_path)
             else:
-                # TODO: function wrap
-                self.version = str(reg_param) + '_' + str(elastic_net_param)
-                mdl_path = self.mdl_path + 'lr_model_' + self.version
+                # if not, generate model path from last retrain/default and load
+                self.mdl_path = self.gen_mdl_path(reg_param, elastic_net_param)
+                print('Loading Saved Model..')
+                self.lr_model = LogisticRegressionModel.load(self.mdl_path)
         else:
-            self.version = str(reg_param) + '_' + str(elastic_net_param)
-            mdl_path = self.mdl_path + 'lr_model_' + self.version
+            # generate model path for this retrain
+            self.mdl_path = self.gen_mdl_path(reg_param, elastic_net_param)
 
             # get train test split
             self.train, self.test = self.current_data.randomSplit([0.9, 0.1], seed=999)
@@ -106,27 +110,40 @@ class OfferLR:
 
             self.lr_model = multi_lr.fit(self.train)
             print('Exporting Model..')
-            self.lr_model.write().overwrite().save(mdl_path)
+            self.lr_model.write().overwrite().save(self.mdl_path)
 
         return self
 
     def transform(self):
-        if self.test is not None:
-            if self.saved:
+        # if using a saved model
+        if self.saved:
+            # if input stream is not empty
+            if self.current_data is not None:
+                # get predictions
                 results = self.lr_model.transform(self.current_data)
             else:
-                # fetch predictions in batch
+                return None
+        else:
+            # if test data is non empty
+            if self.test is not None:
+                # get predictions
                 results = self.lr_model.transform(self.test)
+            else:
+                return None
 
-            # drop unneeded cols from processing
-            results = results.drop(*["lender_id_si", "loan_purpose_si", "credit_si", "annual_income_si", "apr_si",
+        # drop unneeded cols from processing
+        results = results.drop(*["lender_id_si", "loan_purpose_si", "credit_si", "annual_income_si", "apr_si",
                                      "lender_id_enc", "loan_purpose_enc", "credit_enc", "features", "scaled_feat"])
 
-            # TODO: screw around with class imbalance if you have extra time
-            # results = results.filter('is_clicked > 0.0')
-            return results
+        return results
 
-    # getters and setters for those params that could be modified directly
+    def gen_mdl_path(self, reg_param, elastic_net_param):
+        # generate version
+        self.version = str(reg_param) + '_' + str(elastic_net_param)
+        # set model path on object
+        return 'res/models/lr_model_' + self.version
+
+    # getters and setters for those params that could/should be modified directly
     def get_current_data(self):
         return self.current_data
 

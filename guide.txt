@@ -124,7 +124,7 @@ kafka-topics --create --bootstrap-server localhost:29092 --replication-factor 1 
 
 # TODO: remove this
 # test consumer
-kafka-console-consumer --bootstrap-server localhost:29092 --topic current-model-req
+kafka-console-consumer --bootstrap-server localhost:29092 --topic responses
 
 # submit job
 chmod +x run-model.sh

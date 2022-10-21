@@ -25,16 +25,10 @@ spark = SparkSession.builder \
 # prevent overflowing kafka logs
 spark.sparkContext.setLogLevel('WARN')
 
+# constant for kafka server
 KAFKA_SERVER = "kafka-service:9092"
 
-# test_schema = StructType([
-#     StructField("lender_id", LongType(), True),
-#     StructField("loan_purpose", StringType(), True),
-#     StructField("credit", StringType(), True),
-#     StructField("annual_income", DoubleType(), True),
-#     StructField("apr", DoubleType(), True)
-# ])
-
+# define incoming request schema
 test_schema = StructType([
     StructField("lender_id", StringType(), True),
     StructField("loan_purpose", StringType(), True),
@@ -43,8 +37,7 @@ test_schema = StructType([
     StructField("apr", StringType(), True)
 ])
 
-# subscribe to requests topic, open data stream
-print('Request Stream:')
+# subscribe to requests topic
 request_stream = spark \
   .readStream \
   .format("kafka") \
@@ -53,55 +46,49 @@ request_stream = spark \
   .option("startingOffsets", "latest") \
   .load().selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)")
 
-print('Stream Writer:')
+# open data stream, preserve object for loopback
 stream_writer = request_stream.writeStream.format('console').option("truncate", "false")
 stream_writer.start()
 
-# for prediction endpoint requests only
-print('Prediction Stream 1:')
+# filter by request type
 prediction_stream = request_stream.filter(f.col('key') == 'prediction-req')
 prediction_stream.writeStream.format('console').option("truncate", "false").start()
+
 # current_mdl_stream = request_stream.filter(f.col('key') == 'current-mdl-req')
+
 # assignment_stream = request_stream.filter(f.col('key') == 'assignment-req')
 
+# --------- /prediction -------
 # extract JSON
-print('Prediction Stream 2:')
 prediction_stream = prediction_stream.select(f.from_json(f.col("value"), test_schema).alias("raw"))
 prediction_stream.writeStream.format('console').option("truncate", "false").start()
 
-# construct test df
-print('Test Stream:')
+# inflate prediction dataframe from JSON
 test_stream = prediction_stream.select("raw.*")
 test_stream.writeStream.format('console').option("truncate", "false").start()
 
-print('Model:')
 # init model object
 lr_model = OfferLR(spark=spark, saved=True)
-# for up to n predictions from a saved model
+# for up to n predictions in a batch from a saved model
 lr_model.set_current_data(test_stream)
-test_stream.writeStream.format('console').option("truncate", "false").start()
-# execute model
+# execute model predictions
 res_stream = lr_model.prep_data().fit_or_load().transform()
 
+# if input stream is non-empty
 if res_stream is not None:
-    print('Result Stream:')
+    # extract prediction results and deflate to json
+    res_stream = res_stream.select(f.col('rawPrediction'), f.col('probability'), f.col('prediction'))\
+        .withColumn("value", f.to_json(f.struct("*")).cast("string"))
     res_stream.writeStream.format('console').option("truncate", "false").start()
-    stream_writer.start().awaitTermination()
+
+    # subscribe to responses topic and push
+    out_stream = res_stream.select("value") \
+        .writeStream \
+        .outputMode("append") \
+        .format("kafka") \
+        .option("topic", "responses") \
+        .option("kafka.bootstrap.servers", KAFKA_SERVER) \
+        .start().awaitTermination()
 else:
-    print('Empty DataFrame:')
+    # loopback to beginning of data stream
     stream_writer.start().awaitTermination()
-
-#  |-- rawPrediction: vector (nullable = true)
-#  |-- probability: vector (nullable = true)
-#  |-- prediction: double (nullable = false)
-
-# pred_res.select("prediction") \
-#         .writeStream.trigger(processingTime="10 seconds") \
-#         .outputMode("complete") \
-#         .format("kafka") \
-#         .option("topic", "prediction-res") \
-#         .option("kafka.bootstrap.servers", KAFKA_SERVER) \
-#         .start().awaitTermination()
-
-# start = time.time()
-# print("--- Completed in %s ---" % datetime.timedelta(seconds=time.time() - start)) if start is not None else print('Start was None!')
