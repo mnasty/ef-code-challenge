@@ -130,20 +130,6 @@ kafka-console-consumer --bootstrap-server localhost:29092 --topic responses
 chmod +x run-model.sh
 ./run-model.sh
 
-# # lender_id, loan_purpose, credit, annual_income, apr
-#  |-- offer_id: long (nullable = true)
-#  |-- lead_uuid: string (nullable = true)
-#  |-- lender_id: long (nullable = true)
-#  |-- requested: double (nullable = true)
-#  |-- loan_purpose: string (nullable = true)
-#  |-- credit: string (nullable = true)
-#  |-- annual_income: double (nullable = true)
-#  |-- apr: double (nullable = true)
-#  |-- is_clicked: double (nullable = false)
-#  |-- rawPrediction: vector (nullable = true)
-#  |-- probability: vector (nullable = true)
-#  |-- prediction: double (nullable = false)
-
 API:
 ---
 # set/ensure docker env for local API image deployment

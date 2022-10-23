@@ -1,21 +1,18 @@
-from flask import Flask
+from flask import Flask, request
 from confluent_kafka import Producer, Consumer
 import socket
 
 app = Flask('click_api')
 
-# TODO: setup .dockerignore, json
+# TODO: setup .dockerignore, request format error handling
+# TODO: setup key filtering on consumer
+def kafka_req_res(key, request, type='GET'):
+    def process_err(err):
+        # unsubscribe from response topic
+        consumer.close()
+        # deliver exception
+        return 'error: {}'.format(err)
 
-test_json = "{\"lender_id\": \"1103\",\"loan_purpose\": \"debt_consolidation\",\"credit\":" \
-            " \"poor\",\"annual_income\": \"24000.0\",\"apr\":\"199.0\"}"
-
-"""test function"""
-@app.route("/")
-def test_status():
-    return "{status: 200 OK}"
-
-@app.route("/prediction")
-def get_current_model():
     # init config
     prod_conf = {"bootstrap.servers": "kafka-service:9092", "client.id": socket.gethostname(), 'session.timeout.ms': 30000}
     cons_conf = {"bootstrap.servers": "kafka-service:9092", "client.id": socket.gethostname(), 'session.timeout.ms': 30000,
@@ -26,8 +23,15 @@ def get_current_model():
     consumer = Consumer(cons_conf)
     # subscribe to response topic
     consumer.subscribe(["responses"])
-    # package request
-    producer.produce("requests", key="prediction-req", value=test_json)
+
+    # package request based on declared type
+    if type == 'GET':
+        producer.produce("requests", key=key, value=key)
+    elif type == 'POST':
+        producer.produce("requests", key=key, value=request)
+    else:
+        return process_err('unsupported request type!')
+
     # send request
     producer.flush()
 
@@ -38,27 +42,18 @@ def get_current_model():
         while True:
             # check for response every second
             msg = consumer.poll(1.0)
+            # wait until received
             if msg is None:
-                # wait until received
-                print("Waiting for response..")
                 # keep track of the seconds that pass
                 timeout += 1
                 # if the response has taken more than 30 seconds
                 if timeout > 30:
-                    # unsubscribe from response topic
-                    consumer.close()
-                    # deliver timeout exception
-                    return 'error: {}'.format('request timed out!')
+                    return process_err('request timed out!')
+
                 continue
             # if dequeue error occurs
             elif msg.error():
-                # log error
-                err = 'error: {}'.format(msg.error())
-                print(err)
-                # unsubscribe from response topic
-                consumer.close()
-                # deliver response
-                return err
+                return process_err(msg.error())
             else:
                 # when message received
                 value = msg.value()
@@ -73,6 +68,23 @@ def get_current_model():
     finally:
         # unsubscribe from response topic
         consumer.close()
+
+"""test function"""
+@app.route("/")
+def test_status():
+    return "{status: 200 OK}"
+
+@app.route("/predictions", methods=['POST'])
+def predictions():
+    return kafka_req_res(key='prediction-req', type='POST', request=str(request.json))
+
+@app.route("/assignment", methods=['POST'])
+def assignment():
+    return kafka_req_res(key='assignment-req', type='POST', request=str(request.json))
+
+@app.route("/current_model")
+def current_model():
+    return kafka_req_res(key='current-mdl-req', request=None)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)

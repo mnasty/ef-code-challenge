@@ -10,10 +10,10 @@ from sqlalchemy import create_engine
 """finish documenting this class"""
 class OfferLR:
 
-    def __init__(self, spark, mdl_path=None, saved=False):
+    def __init__(self, spark, saved=False):
         self.spark = spark
         self.saved = saved
-        self.mdl_path = mdl_path
+        self.mdl_path = None
         self.version = None
         self.current_data = None
         self.train = None
@@ -25,7 +25,7 @@ class OfferLR:
         # local only
         # engine = create_engine('postgresql://postgres:password@localhost:5432/postgres')
         # k8s only
-        # TODO: reassign uri to unique kubernetes virtual network IP
+        # TODO: reassign uri to unique kubernetes virtual network IP for retrain deployments
         engine = create_engine('postgresql://postgres:password@10.110.230.221:5432/postgres')
 
         # define query and join conditions to generate train set
@@ -82,22 +82,13 @@ class OfferLR:
 
         # apply to data
         self.current_data = preprocess_pipe_mdl.transform(self.current_data)
-        # TODO: remove this
-        self.current_data.writeStream.format('console').option("truncate", "false").start()
         return self
 
     def fit_or_load(self, reg_param=0.1, elastic_net_param=1.0):
         # if using a saved model
         if self.saved:
-            # if we've already set a model path, load model
-            if self.mdl_path is not None:
-                print('Loading Saved Model..')
-                self.lr_model = LogisticRegressionModel.load(self.mdl_path)
-            else:
-                # if not, generate model path from last retrain/default and load
-                self.mdl_path = self.gen_mdl_path(reg_param, elastic_net_param)
-                print('Loading Saved Model..')
-                self.lr_model = LogisticRegressionModel.load(self.mdl_path)
+            print('Loading Saved Model..')
+            self.lr_model = LogisticRegressionModel.load('res/models/lr_model_' + self.fetch_local_version())
         else:
             # generate model path for this retrain
             self.mdl_path = self.gen_mdl_path(reg_param, elastic_net_param)
@@ -142,6 +133,12 @@ class OfferLR:
         self.version = str(reg_param) + '_' + str(elastic_net_param)
         # set model path on object
         return 'res/models/lr_model_' + self.version
+
+    def fetch_local_version(self):
+        # with open('version.txt', 'r') as file:
+        self.version = open('version.txt', 'r').read().replace('\n', '')
+        # set model path on object
+        return self.version
 
     # getters and setters for those params that could/should be modified directly
     def get_current_data(self):
