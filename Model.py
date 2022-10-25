@@ -6,11 +6,25 @@ from pyspark.ml import Pipeline, PipelineModel
 import pandas as pd
 from sqlalchemy import create_engine
 
-# TODO: ensure pythonic formatting
-"""finish documenting this class"""
+"""Offer Logistic Regression class that encapsulates a logistic 
+regression model and provides methods to handle each step in the
+model execution process from data fetching and preprocessing to 
+handling predictions.
+
+Params:
+@spark: spark session instance for processing
+@saved: is using saved model
+@db_uri: jdbc uri for accessing db with version table (saved only)
+@version: the version of the model based on hyperparams
+@mdl_path: the full path of the model to load locally
+@current_data: placeholder to pass data transformations between obj methods
+@train: placeholder for train data after split (retrain only)
+@test: placeholder for test data after split (retrain only)
+@lr_model: placeholder for a loaded model object (saved only)
+"""
 class OfferLR:
 
-    def __init__(self, spark, db_uri, saved=False):
+    def __init__(self, spark, db_uri=None, saved=False):
         self.spark = spark
         self.saved = saved
         self.db_uri = db_uri
@@ -21,6 +35,7 @@ class OfferLR:
         self.test = None
         self.lr_model = None
 
+    # fetch data for retrains
     def pull_data(self):
         # create engine to direct pandas to the features database
         engine = create_engine(self.db_uri)
@@ -36,12 +51,16 @@ class OfferLR:
 
         # execute query from local database
         join_data = pd.read_sql(q, engine)
+        # load results into a spark df
         self.current_data = self.spark.createDataFrame(join_data)
 
         return self
 
+    # preprocess data for model ingestion
     def prep_data(self):
+        # if using a saved model
         if self.saved:
+            # simply load the pickled pipeline
             preprocess_pipe_mdl = PipelineModel.load('res/models/prep_pline')
         else:
             # generate a target column based on if a timestamp was present or not, clean up old column
@@ -81,10 +100,11 @@ class OfferLR:
         self.current_data = preprocess_pipe_mdl.transform(self.current_data)
         return self
 
+    # manage the creation of a trained model object
     def fit_or_load(self, reg_param=0.1, elastic_net_param=1.0):
         # if using a saved model
         if self.saved:
-            print('Loading Saved Model..')
+            # simply load the saved model, using helper method to get the correct path
             self.lr_model = LogisticRegressionModel.load(self.fetch_mdl_path())
         else:
             # generate model path for this retrain
@@ -96,12 +116,14 @@ class OfferLR:
             multi_lr = LogisticRegression(regParam=reg_param, elasticNetParam=elastic_net_param, family="multinomial",
                                           featuresCol="scaled_feat", labelCol="is_clicked")
 
+            # train model
             self.lr_model = multi_lr.fit(self.train)
-            print('Exporting Model..')
+            # export pickled model
             self.lr_model.write().overwrite().save(self.mdl_path)
 
         return self
 
+    # apply predictions from a model
     def transform(self):
         # if using a saved model
         if self.saved:
@@ -125,12 +147,14 @@ class OfferLR:
 
         return results
 
+    # generate a version and model path dynamically when retraining
     def gen_mdl_path(self, reg_param, elastic_net_param):
         # generate version
         self.version = str(reg_param) + '_' + str(elastic_net_param)
         # set model path on object
         return 'res/models/lr_model_' + self.version
 
+    # retrieve assigned model version and assemble path when streaming
     def fetch_mdl_path(self):
         # create engine
         engine = create_engine(self.db_uri)
@@ -148,7 +172,7 @@ class OfferLR:
             # return dynamically built path
             return 'res/models/lr_model_' + self.version
 
-    # getters and setters for those params that could/should be modified directly
+    # getters and setters for those params that could be modified directly
     def get_current_data(self):
         return self.current_data
 

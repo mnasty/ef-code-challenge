@@ -1,0 +1,4 @@
+api/*
+model-venv/*
+.gitignore
+LoadData.py

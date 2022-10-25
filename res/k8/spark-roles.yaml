@@ -10,8 +10,8 @@ metadata:
   name: spark-role
 rules:
 - apiGroups: [""]
-  resources: ["pods", "services", "configmaps" ]
-  verbs: ["create", "get", "watch", "list", "post", "delete"  ]
+  resources: ["pods", "services", "configmaps"]
+  verbs: ["create", "get", "watch", "list", "post", "delete"]
 ---
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1

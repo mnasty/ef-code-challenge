@@ -10,16 +10,16 @@ from Model import OfferLR
 #     .config('spark.sql.execution.arrow.pyspark.enabled', 'true') \
 #     .appName('lr-model') \
 #     .getOrCreate()
-#
-# # for a full retrain
-# retrain_lr = OfferLR(spark=spark)
-# retrain_res = retrain_lr.pull_data().prep_data() #.fit_or_load(reg_param=0.5, elastic_net_param=0.0).transform()
-# retrain_res.get_current_data().show(truncate=False)
 
 # init spark (k8s only) ->
 spark = SparkSession.builder \
     .appName('lr-model') \
     .getOrCreate()
+
+# # for a full retrain
+# retrain_lr = OfferLR(spark=spark)
+# retrain_res = retrain_lr.pull_data().prep_data() #.fit_or_load(reg_param=0.5, elastic_net_param=0.0).transform()
+# retrain_res.get_current_data().show(truncate=False)
 
 # init model objects for each version
 # TODO: reassign db_uri to unique kubernetes virtual network IP for retrain deployments
@@ -66,6 +66,7 @@ lr_model.set_current_data(test_stream)
 # execute model predictions
 res_stream = lr_model.prep_data().fit_or_load().transform()
 
+# if result stream is non-empty
 if res_stream is not None:
     # extract prediction results and deflate to json
     res_stream = res_stream.select(f.col('rawPrediction'), f.col('probability'), f.col('prediction')) \

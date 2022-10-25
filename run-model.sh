@@ -1,3 +1,4 @@
+# spark submit script to deploy streaming application on k8 cluster
 spark-submit \
 --deploy-mode cluster \
 --master k8s://https://127.0.0.1:52306 \

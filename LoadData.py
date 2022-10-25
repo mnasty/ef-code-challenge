@@ -2,7 +2,7 @@ import re
 import pandas as pd
 from sqlalchemy import create_engine, DDL
 
-# class not appropriate for single method process
+# note: class not appropriate for single method process
 
 # define extensible list of parquet files
 parquets = ['res/ds_clicks.parquet.gzip', 'res/ds_leads.parquet.gzip', 'res/ds_offers.parquet.gzip']

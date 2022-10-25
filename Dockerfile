@@ -22,9 +22,3 @@ COPY Main.py /app/Main.py
 COPY Model.py /app/Model.py
 COPY requirements-model.txt /app/requirements.txt
 RUN pip install -r requirements.txt --src /usr/local/src
-
-# TODO: remove this
-#COPY . .
-
-# TODO: remove this
-#CMD [ "python3", "Main.py" ]

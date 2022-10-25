@@ -7,7 +7,7 @@ from sqlalchemy import create_engine
 
 app = Flask('click_api')
 
-# TODO: setup .dockerignore, request format error handling
+# TODO: additional request format error handling?
 def kafka_req_res(key, request, type='GET'):
     def process_err(err):
         # unsubscribe from response topic
@@ -71,19 +71,24 @@ def kafka_req_res(key, request, type='GET'):
         # unsubscribe from response topic
         consumer.close()
 
-"""test function"""
+# base route test function to confirm API status
 @app.route("/")
 def test_status():
     return "{status: 200 OK}"
 
+# submit prediction requests to kafka for spark stream processing
 @app.route("/predictions", methods=['POST'])
 def predictions():
     return kafka_req_res(key='prediction-req', type='POST', request=str(request.json))
 
+# assign model version
 @app.route("/assignment", methods=['POST'])
 def assignment():
+    # create set to store valid versions
     valid_versions = {'0.1_1.0', '0.5_0.0'}
+    # extract version from request json
     version = request.get_json()['version']
+    # if version is valid
     if version in valid_versions:
         # TODO: reassign uri to unique kubernetes virtual network IP for retrain deployments
         # create engine to link to version table
@@ -93,11 +98,12 @@ def assignment():
         # commit assigned version
         table.to_sql('version', engine, schema='features', if_exists='replace')
         # send confirmation response
-        # {"ver": {"0": "0.5_0.0"}}
         return '{\"version\": {\"0\": ' + version + ', \"set\": \"True\"}'
     else:
+        # send invalid response
         return '{\"version\": {\"0\": \"invalid\", \"set\": \"False\"}'
 
+# fetch current model version
 @app.route("/current_model")
 def current_model():
     # TODO: reassign uri to unique kubernetes virtual network IP for retrain deployments
