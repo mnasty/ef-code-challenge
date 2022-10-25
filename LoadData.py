@@ -31,8 +31,7 @@ with engine.connect() as con:
 
 # execute data insertion for each table
 for table_tup in tables:
-    print("Loading", table_tup[1])
-                                                                # can be 'append'
+    print("Loading", table_tup[1])                                # can be 'append'
     table_tup[0].to_sql(table_tup[1], engine, schema='features', if_exists='replace')
 
 print("Done!")

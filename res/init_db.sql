@@ -4,6 +4,17 @@
 CREATE SCHEMA IF NOT EXISTS features
     AUTHORIZATION postgres;
 
+--create version table
+CREATE TABLE IF NOT EXISTS features.version
+(
+    ver text COLLATE pg_catalog."default"
+)
+
+TABLESPACE pg_default;
+
+ALTER TABLE IF EXISTS features.version
+    OWNER to postgres;
+
 --create ds_clicks table
 CREATE TABLE IF NOT EXISTS features.ds_clicks
 (

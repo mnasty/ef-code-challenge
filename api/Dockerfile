@@ -4,9 +4,13 @@ RUN apt-get clean \
     && apt-get -y update
 
 RUN apt-get -y install \
+    postgresql \
     nginx \
     python3-dev \
     build-essential
+
+RUN apt-get install \
+    --reinstall libpq-dev
 
 WORKDIR /app
 

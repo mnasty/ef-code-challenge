@@ -2,10 +2,12 @@ from flask import Flask, request
 from confluent_kafka import Producer, Consumer
 import socket
 
+import pandas as pd
+from sqlalchemy import create_engine
+
 app = Flask('click_api')
 
 # TODO: setup .dockerignore, request format error handling
-# TODO: setup key filtering on consumer
 def kafka_req_res(key, request, type='GET'):
     def process_err(err):
         # unsubscribe from response topic
@@ -80,11 +82,31 @@ def predictions():
 
 @app.route("/assignment", methods=['POST'])
 def assignment():
-    return kafka_req_res(key='assignment-req', type='POST', request=str(request.json))
+    valid_versions = {'0.1_1.0', '0.5_0.0'}
+    version = request.get_json()['version']
+    if version in valid_versions:
+        # TODO: reassign uri to unique kubernetes virtual network IP for retrain deployments
+        # create engine to link to version table
+        engine = create_engine('postgresql://postgres:password@10.110.230.221:5432/postgres')
+        # assemble table structure
+        table = pd.DataFrame([version], columns=['ver'])
+        # commit assigned version
+        table.to_sql('version', engine, schema='features', if_exists='replace')
+        # send confirmation response
+        # {"ver": {"0": "0.5_0.0"}}
+        return '{\"version\": {\"0\": ' + version + ', \"set\": \"True\"}'
+    else:
+        return '{\"version\": {\"0\": \"invalid\", \"set\": \"False\"}'
 
 @app.route("/current_model")
 def current_model():
-    return kafka_req_res(key='current-mdl-req', request=None)
+    # TODO: reassign uri to unique kubernetes virtual network IP for retrain deployments
+    # create engine to link to version table
+    engine = create_engine('postgresql://postgres:password@10.110.230.221:5432/postgres')
+    # get version
+    version = pd.read_sql('SELECT ver AS version FROM features.version', engine)
+    # convert to JSON and return
+    return version.to_json()
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)

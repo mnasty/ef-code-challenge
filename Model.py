@@ -10,11 +10,12 @@ from sqlalchemy import create_engine
 """finish documenting this class"""
 class OfferLR:
 
-    def __init__(self, spark, saved=False):
+    def __init__(self, spark, db_uri, saved=False):
         self.spark = spark
         self.saved = saved
-        self.mdl_path = None
+        self.db_uri = db_uri
         self.version = None
+        self.mdl_path = None
         self.current_data = None
         self.train = None
         self.test = None
@@ -22,11 +23,7 @@ class OfferLR:
 
     def pull_data(self):
         # create engine to direct pandas to the features database
-        # local only
-        # engine = create_engine('postgresql://postgres:password@localhost:5432/postgres')
-        # k8s only
-        # TODO: reassign uri to unique kubernetes virtual network IP for retrain deployments
-        engine = create_engine('postgresql://postgres:password@10.110.230.221:5432/postgres')
+        engine = create_engine(self.db_uri)
 
         # define query and join conditions to generate train set
         q = "SELECT COALESCE(features.ds_clicks.offer_id, features.ds_offers.offer_id) AS offer_id, " \
@@ -88,7 +85,7 @@ class OfferLR:
         # if using a saved model
         if self.saved:
             print('Loading Saved Model..')
-            self.lr_model = LogisticRegressionModel.load('res/models/lr_model_' + self.fetch_local_version())
+            self.lr_model = LogisticRegressionModel.load(self.fetch_mdl_path())
         else:
             # generate model path for this retrain
             self.mdl_path = self.gen_mdl_path(reg_param, elastic_net_param)
@@ -134,11 +131,22 @@ class OfferLR:
         # set model path on object
         return 'res/models/lr_model_' + self.version
 
-    def fetch_local_version(self):
-        # with open('version.txt', 'r') as file:
-        self.version = open('version.txt', 'r').read().replace('\n', '')
-        # set model path on object
-        return self.version
+    def fetch_mdl_path(self):
+        # create engine
+        engine = create_engine(self.db_uri)
+        # pull set version from db
+        ver_df = pd.read_sql('SELECT ver AS version FROM features.version', engine)
+        # extract version value from df
+        self.version = ver_df.iloc[0]['version']
+        # if retrieved version is non-empty
+        if self.version:
+            # return dynamically built path
+            return 'res/models/lr_model_' + self.version
+        else:
+            # set default version
+            self.version = '0.1_1.0'
+            # return dynamically built path
+            return 'res/models/lr_model_' + self.version
 
     # getters and setters for those params that could/should be modified directly
     def get_current_data(self):
@@ -159,6 +167,9 @@ class OfferLR:
     def get_version(self):
         return self.version
 
+    def get_db_uri(self):
+        return self.db_uri
+
     def set_current_data(self, data):
         self.current_data = data
 
@@ -177,3 +188,5 @@ class OfferLR:
     def set_version(self, version):
         self.version = version
 
+    def set_db_uri(self, db_uri):
+        self.db_uri = db_uri
