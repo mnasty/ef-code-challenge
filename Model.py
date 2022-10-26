@@ -160,10 +160,10 @@ class OfferLR:
         engine = create_engine(self.db_uri)
         # pull set version from db
         ver_df = pd.read_sql('SELECT ver AS version FROM features.version', engine)
-        # extract version value from df
-        self.version = ver_df.iloc[0]['version']
         # if retrieved version is non-empty
-        if self.version:
+        if not ver_df.empty:
+            # extract version value from df
+            self.version = ver_df.iloc[0]['version']
             # return dynamically built path
             return 'res/models/lr_model_' + self.version
         else:

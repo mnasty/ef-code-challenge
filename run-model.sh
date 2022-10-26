@@ -1,7 +1,7 @@
 # spark submit script to deploy streaming application on k8 cluster
 spark-submit \
 --deploy-mode cluster \
---master k8s://https://127.0.0.1:52306 \
+--master k8s://https://127.0.0.1:59296 \
 --conf spark.kubernetes.namespace=default \
 --conf spark.driver.memory=2g \
 --conf spark.executor.instances=1 \

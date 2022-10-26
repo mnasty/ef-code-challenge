@@ -6,11 +6,11 @@
 
 #### Docker Desktop: https://www.docker.com/products/docker-desktop/
 
-#### Apache Spark: https://spark.apache.org/downloads.html
+#### Apache Spark (3.3.0 / 2.11): https://spark.apache.org/downloads.html
 
 ### Once all prerequisites are installed:
 
-#### Clone this repo into the directory of your choice: \
+#### Clone this repo into the directory of your choice: 
 ```git clone https://github.com/mnasty/ef-code-challenge.git```
 
 #### Configure docker desktop memory constraints to ensure at least 8GB of memory is avaliable to docker:
@@ -19,25 +19,26 @@
 
 ![alt text](https://github.com/mnasty/ef-code-challenge/blob/master/res/screenshots/screen2.png?raw=true)
 
-#### Start local kubernetes environment (min 2 cpus, 8GB memory): \
+#### Start local kubernetes environment (min 2 cpus, 8GB memory):
 ```minikube start --driver=docker --memory 8192 --cpus 4```
 
 ---
 
 ### Database Deployment (Postgres):
 
-#### Apply yaml defined K8 components to support DB: \
-```
-kubectl apply -f res/k8/postgres-cm.yaml
-kubectl apply -f res/k8/postgres-pv.yaml
-kubectl apply -f res/k8/postgres-svc.yaml
-kubectl apply -f res/k8/postgres-sec.yaml
-```
+#### Apply yaml defined K8 components to support DB:
+```kubectl apply -f res/k8/postgres-cm.yaml```
+```kubectl apply -f res/k8/postgres-pv.yaml```
+```kubectl apply -f res/k8/postgres-svc.yaml```
+```kubectl apply -f res/k8/postgres-sec.yaml```
 
 #### Submit deployment, spin up DB:
 ```
 kubectl apply -f res/k8/postgres-dep.yaml
 ```
+
+#### Ensure any local postgres services are not running:
+```brew services stop postgresql```
 
 #### List pod names:
 ```kubectl get all```
@@ -57,37 +58,16 @@ NAME                                  DESIRED   CURRENT   READY   AGE
 replicaset.apps/postgres-76c84dc8d8   1         1         1       8d
 ```
 
-#### Access pod and psql from command line (equivalent to ssh & psql):
-```
-kubectl exec -it postgres-76c84dc8d8-465gn --  psql -h localhost -U postgres --password -p 5432 postgres
-Password=password
-```
+#### Forward postgres port outside K8 virtual network using pod name:
+```kubectl port-forward <pod_name> 5432:5432```
 
-#### Ensure any local postgres services are not running:
-```brew services stop postgresql```
-
-#### Forward postgres port outside K8 virtual network:
-```kubectl port-forward postgres-76c84dc8d8-465gn 5432:5432```
-
-#### Execute LoadData.py to load data into DB:
+#### Execute LoadData.py to load data into DB (in a new terminal window):
+```source model-venv/bin/activate``` \
 ```python3 LoadData.py```
 
 ---
 
-### Model Deployment (Spark):
-
-#### Go to spark home (root dir of unzipped spark download):
-```cd $SPARK_HOME``` or
-```cd spark-3.3.0-bin-hadoop3/```
-
-#### Set/ensure docker env for local API image deployment:
-```eval $(minikube docker-env)```
-
-#### Build docker image for spark & pyspark:
-```bin/docker-image-tool.sh -m -t 3.3.0 -p ./kubernetes/dockerfiles/spark/bindings/python/Dockerfile build```
-
-#### Go back to project root (wherever you cloned this repo)
-```cd .../```
+### API Deployment (Flask):
 
 #### Configure jdbc uri: 
 ```kubectl get all```
@@ -110,71 +90,6 @@ replicaset.apps/postgres-76c84dc8d8   1         1         1       8d
 ```
 Reconstruct URI for k8 virtual network:
 ```postgresql://postgres:password@<paste_here>:5432/postgres```
-```
-Main:26 -> db_uri=postgresql://postgres:password@10.110.230.221:5432/postgres
-```
-
-#### Update cluster ports:
-```kubectl cluster-info```
-
-Locate and copy port:
-```
-...:code-challenge Mick$ kubectl cluster-info
-Kubernetes control plane is running at https://127.0.0.1:(*port*->)52306
-CoreDNS is running at https://127.0.0.1:52306/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy
-
-To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.
-```
-
-```nano run-model.sh```
-
-Apply new port:
-```
-run-model.sh:4 -> --master k8s://https://127.0.0.1:xxxxx \
-```
-
-#### Set/ensure docker env for local API image deployment:
-```eval $(minikube docker-env)```
-
-#### Build custom image for env, ensure you're running from project root:
-```docker build . -t click-model-env:latest```
-
-#### Deploy zookeeper:
-```kubectl apply -f res/k8/zookeeper-svc.yaml``` \
-```kubectl apply -f res/k8/zookeeper-dep.yaml```
-
-#### Deploy kafka:
-```kubectl apply -f res/k8/kafka-svc.yaml``` \
-```kubectl apply -f res/k8/kafka-dep.yaml```
-
-#### Apply spark config:
-```kubectl apply -f res/k8/spark-roles.yaml```
-
-#### Ensure all deployed resources have spun up successfully:
-```kubectl get all``` 
-
-***STATUS = Running***
-
-Access kafka pod, repeating procedure "List pod names:" above (equivalent to ssh): \
-```kubectl exec -it kafka-deployment-6b7b57cbd9-sd27c -- /bin/bash```
-
-#### Create topics:
-```
-kafka-topics --create --bootstrap-server localhost:29092 --replication-factor 1 --partitions 1 --topic requests
-kafka-topics --create --bootstrap-server localhost:29092 --replication-factor 1 --partitions 1 --topic responses
-```
-
-#### Submit streaming job:
-```
-chmod +x run-model.sh
-./run-model.sh
-```
-
----
-
-### API Deployment (Flask):
-
-#### Configure jdbc uri (repeating procedure above):
 ```
 API:95 -> engine = create_engine('postgresql://postgres:password@<paste_here>:5432/postgres')
 API:111 -> engine = create_engine('postgresql://postgres:password@<paste_here>:5432/postgres')
@@ -203,6 +118,87 @@ API:111 -> engine = create_engine('postgresql://postgres:password@<paste_here>:5
 
 ---
 
+### Model Deployment (Spark):
+
+#### Go to spark home (root dir of unzipped spark download):
+```cd $SPARK_HOME``` or
+```cd spark-3.3.0-bin-hadoop3/```
+
+#### Set/ensure docker env for local API image deployment:
+```eval $(minikube docker-env)```
+
+#### Build docker image for spark & pyspark:
+```bin/docker-image-tool.sh -m -t 3.3.0 -p ./kubernetes/dockerfiles/spark/bindings/python/Dockerfile build```
+
+#### Go back to project root (wherever you cloned this repo)
+```cd .../```
+
+#### Configure jdbc uri (repeating procedure above):
+```
+Main:26 -> db_uri=postgresql://postgres:password@10.110.230.221:5432/postgres
+```
+
+#### Update cluster ports:
+```kubectl cluster-info```
+
+Locate and copy port:
+```
+...:code-challenge Mick$ kubectl cluster-info
+Kubernetes control plane is running at https://127.0.0.1:(*port*->)52306
+CoreDNS is running at https://127.0.0.1:52306/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy
+
+To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.
+```
+
+```nano run-model.sh```
+
+Apply new port:
+```
+run-model.sh:4 -> --master k8s://https://127.0.0.1:xxxxx \
+```
+
+#### Set/ensure docker env for local API image deployment:
+```eval $(minikube docker-env)```
+
+#### Build custom image for env, **ensure you're running from project root**:
+```docker build . -t click-model-env:latest```
+
+#### Deploy zookeeper:
+```kubectl apply -f res/k8/zookeeper-svc.yaml``` \
+```kubectl apply -f res/k8/zookeeper-dep.yaml```
+
+#### Deploy kafka:
+```kubectl apply -f res/k8/kafka-svc.yaml``` \
+```kubectl apply -f res/k8/kafka-dep.yaml```
+
+#### Apply spark config:
+```kubectl apply -f res/k8/spark-roles.yaml```
+
+#### Ensure all deployed resources have spun up successfully:
+```kubectl get all``` 
+
+***STATUS = Running***
+
+Access kafka pod, repeating procedure "List pod names:" above (equivalent to ssh): \
+```kubectl exec -it kafka-deployment-6b7b57cbd9-sd27c -- /bin/bash```
+
+#### Create topics:
+```
+kafka-topics --create --bootstrap-server localhost:29092 --replication-factor 1 --partitions 1 --topic requests
+```
+```
+kafka-topics --create --bootstrap-server localhost:29092 --replication-factor 1 --partitions 1 --topic responses
+```
+```exit```
+
+#### Submit streaming job:
+```
+chmod +x run-model.sh
+./run-model.sh
+```
+
+---
+
 ### Monitor and View All Deployments:
 ```minikube dashboard```
 
@@ -210,12 +206,65 @@ API:111 -> engine = create_engine('postgresql://postgres:password@<paste_here>:5
 
 ### Test Deployments:
 
-Download Postman and load <file_name> to test each API endpoint. 
+Download Postman: https://www.postman.com/downloads/
 
-Port config
+Load 'Click API.postman_collection.json' to test each API endpoint. 
+
+Ensure that the port on each request matches the click service port when exposed via minikube:
+```
+MGGD1-PC-2:~ Mick$ minikube service click-service
+|-----------|---------------|-------------|---------------------------|
+| NAMESPACE |     NAME      | TARGET PORT |            URL            |
+|-----------|---------------|-------------|---------------------------|
+| default   | click-service | api/8080    | http://192.168.49.2:32343 |
+|-----------|---------------|-------------|---------------------------|
+🏃  Starting tunnel for service click-service.
+|-----------|---------------|-------------|------------------------|
+| NAMESPACE |     NAME      | TARGET PORT |          URL           |
+|-----------|---------------|-------------|------------------------|
+| default   | click-service |             | http://127.0.0.1:(*port*->)49756 |
+|-----------|---------------|-------------|------------------------|
+🎉  Opening service default/click-service in default browser...
+❗  Because you are using a Docker driver on darwin, the terminal needs to be open to run it.
+```
 
 ---
 
 ### Sample requests and responses:
 
-/endpoint..
+####/predictions
+req:
+```
+{
+	"lender_id": "1103",
+	"loan_purpose": "debt_consolidation",
+	"credit":"poor",
+	"annual_income": "24000.0",
+	"apr":"199.0"
+}
+```
+
+res:
+```
+{
+  "rawPrediction": {
+    "type": 1,
+    "values": [
+      1.939631552899531,
+      -1.939631552899531
+    ]
+  },
+  "probability": {
+    "type": 1,
+    "values": [
+      0.9797523898258298,
+      0.020247610174170174
+    ]
+  },
+  "prediction": 0
+}
+```
+
+###/assignment
+
+###/current_model

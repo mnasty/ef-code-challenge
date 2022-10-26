@@ -1,0 +1,98 @@
+{
+	"info": {
+		"name": "Click API",
+		"_postman_id": "f5675272-5673-3ba1-e431-10e496136491",
+		"description": "",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Current Model",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {},
+				"url": {
+					"raw": "http://127.0.0.1:49756/current_model",
+					"protocol": "http",
+					"host": [
+						"127",
+						"0",
+						"0",
+						"1"
+					],
+					"port": "49756",
+					"path": [
+						"current_model"
+					]
+				},
+				"description": ""
+			},
+			"response": []
+		},
+		{
+			"name": "Predictions",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n\t\"lender_id\": \"1103\",\n\t\"loan_purpose\": \"debt_consolidation\",\n\t\"credit\":\"poor\",\n\t\"annual_income\": \"24000.0\",\n\t\"apr\":\"199.0\"\n}"
+				},
+				"url": {
+					"raw": "http://127.0.0.1:49756/predictions",
+					"protocol": "http",
+					"host": [
+						"127",
+						"0",
+						"0",
+						"1"
+					],
+					"port": "49756",
+					"path": [
+						"predictions"
+					]
+				},
+				"description": ""
+			},
+			"response": []
+		},
+		{
+			"name": "Assignment",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n\t\"version\": \"0.5_0.0\"\n}"
+				},
+				"url": {
+					"raw": "http://127.0.0.1:49756/assignment",
+					"protocol": "http",
+					"host": [
+						"127",
+						"0",
+						"0",
+						"1"
+					],
+					"port": "49756",
+					"path": [
+						"assignment"
+					]
+				},
+				"description": ""
+			},
+			"response": []
+		}
+	]
+}
