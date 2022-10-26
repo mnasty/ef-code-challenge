@@ -230,13 +230,14 @@ Ensure that the port on each request matches the click service port when exposed
 
 ![alt text](https://github.com/mnasty/ef-code-challenge/blob/master/res/screenshots/screen4.png?raw=true)
 
-To delete cluster and all deployments when finished: \
+#### To delete cluster and all deployments when finished:
 ```minikube delete```
+
 ---
 
 ### Sample requests and responses:
 
-####/predictions - POST
+### /predictions - POST
 req:
 ```
 {
@@ -269,7 +270,7 @@ res:
 }
 ```
 
-###/assignment - POST
+### /assignment - POST
 req:
 ```
 {
@@ -287,7 +288,7 @@ res:
 }
 ```
 
-###/current_model - GET
+### /current_model - GET
 ```
 {
   "version": {
