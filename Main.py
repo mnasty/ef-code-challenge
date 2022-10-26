@@ -23,7 +23,7 @@ spark = SparkSession.builder \
 
 # init model objects for each version
 # TODO: reassign db_uri to unique kubernetes virtual network IP for retrain deployments
-lr_model = OfferLR(spark=spark, db_uri='postgresql://postgres:password@10.101.216.188:5432/postgres', saved=True)
+lr_model = OfferLR(spark=spark, db_uri='postgresql://postgres:password@10.101.93.68:5432/postgres', saved=True)
 
 # prevent overflowing kafka logs
 spark.sparkContext.setLogLevel('WARN')

@@ -92,27 +92,31 @@ def assignment():
     if version in valid_versions:
         # TODO: reassign uri to unique kubernetes virtual network IP for retrain deployments
         # create engine to link to version table
-        engine = create_engine('postgresql://postgres:password@10.110.230.221:5432/postgres')
+        engine = create_engine('postgresql://postgres:password@10.101.93.68:5432/postgres')
         # assemble table structure
         table = pd.DataFrame([version], columns=['ver'])
         # commit assigned version
         table.to_sql('version', engine, schema='features', if_exists='replace')
         # send confirmation response
-        return '{\"version\": {\"0\": ' + version + ', \"set\": \"True\"}'
+        return '{\"version\": {\"0\": \"' + version + '\", \"set\": \"True\"}}'
     else:
         # send invalid response
-        return '{\"version\": {\"0\": \"invalid\", \"set\": \"False\"}'
+        return '{\"version\": {\"0\": \"invalid\", \"set\": \"False\"}}'
 
 # fetch current model version
 @app.route("/current_model")
 def current_model():
     # TODO: reassign uri to unique kubernetes virtual network IP for retrain deployments
     # create engine to link to version table
-    engine = create_engine('postgresql://postgres:password@10.110.230.221:5432/postgres')
+    engine = create_engine('postgresql://postgres:password@10.101.93.68:5432/postgres')
     # get version
     version = pd.read_sql('SELECT ver AS version FROM features.version', engine)
-    # convert to JSON and return
-    return version.to_json()
+    if not version.empty:
+        # convert to JSON and return
+        return version.to_json()
+    else:
+        # return no version set
+        return '{\"version\": {\"0\": \"none set\"}}'
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)

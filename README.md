@@ -27,15 +27,13 @@
 ### Database Deployment (Postgres):
 
 #### Apply yaml defined K8 components to support DB:
-```kubectl apply -f res/k8/postgres-cm.yaml```
-```kubectl apply -f res/k8/postgres-pv.yaml```
-```kubectl apply -f res/k8/postgres-svc.yaml```
+```kubectl apply -f res/k8/postgres-cm.yaml``` \
+```kubectl apply -f res/k8/postgres-pv.yaml``` \
+```kubectl apply -f res/k8/postgres-svc.yaml``` \
 ```kubectl apply -f res/k8/postgres-sec.yaml```
 
 #### Submit deployment, spin up DB:
-```
-kubectl apply -f res/k8/postgres-dep.yaml
-```
+```kubectl apply -f res/k8/postgres-dep.yaml```
 
 #### Ensure any local postgres services are not running:
 ```brew services stop postgresql```
@@ -210,29 +208,35 @@ Download Postman: https://www.postman.com/downloads/
 
 Load 'Click API.postman_collection.json' to test each API endpoint. 
 
+![alt text](https://github.com/mnasty/ef-code-challenge/blob/master/res/screenshots/screen3.png?raw=true)
+
 Ensure that the port on each request matches the click service port when exposed via minikube:
 ```
-MGGD1-PC-2:~ Mick$ minikube service click-service
+...:~ Mick$ minikube service click-service
 |-----------|---------------|-------------|---------------------------|
 | NAMESPACE |     NAME      | TARGET PORT |            URL            |
 |-----------|---------------|-------------|---------------------------|
-| default   | click-service | api/8080    | http://192.168.49.2:32343 |
+| default   | click-service | api/8080    | http://192.168.49.2:31074 |
 |-----------|---------------|-------------|---------------------------|
 🏃  Starting tunnel for service click-service.
 |-----------|---------------|-------------|------------------------|
 | NAMESPACE |     NAME      | TARGET PORT |          URL           |
 |-----------|---------------|-------------|------------------------|
-| default   | click-service |             | http://127.0.0.1:(*port*->)49756 |
+| default   | click-service |             | http://127.0.0.1:(*port*->)60946 |
 |-----------|---------------|-------------|------------------------|
 🎉  Opening service default/click-service in default browser...
 ❗  Because you are using a Docker driver on darwin, the terminal needs to be open to run it.
 ```
 
+![alt text](https://github.com/mnasty/ef-code-challenge/blob/master/res/screenshots/screen4.png?raw=true)
+
+To delete cluster and all deployments when finished: \
+```minikube delete```
 ---
 
 ### Sample requests and responses:
 
-####/predictions
+####/predictions - POST
 req:
 ```
 {
@@ -265,6 +269,37 @@ res:
 }
 ```
 
-###/assignment
+###/assignment - POST
+req:
+```
+{
+	"version": "0.5_0.0"
+}
+```
 
-###/current_model
+res:
+```
+{
+  "version": {
+    "0": "0.5_0.0",
+    "set": "True"
+  }
+}
+```
+
+###/current_model - GET
+```
+{
+  "version": {
+    "0": "none set"
+  }
+}
+```
+
+```
+{
+  "version": {
+    "0": "0.5_0.0"
+  }
+}
+```
